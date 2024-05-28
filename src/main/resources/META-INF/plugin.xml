@@ -1,0 +1,50 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the hygge.plugin. It should be FQN. It cannot be changed between the hygge.plugin versions. -->
+    <id>com.example.plugin-demo</id>
+
+    <!-- Public hygge.plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>My-Demo</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="support@yourcompany.com" url="https://www.yourcompany.com">YourCompany</vendor>
+
+    <!-- Description of the hygge.plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    <h1>简单测试<h1/>
+    <h2>听说你支持 Html 标签？</h2>
+    <h2>是真的？<h2/>
+    <h2>最低长度不能低于 40 个字哟<h2/>
+  ]]></description>
+
+    <!-- Product and hygge.plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <!-- Extension points defined by the hygge.plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow factoryClass="hygge.plugin.generator.component.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <notificationGroup id="Global_NotificationsUtil" displayType="BALLOON"/>
+    </extensions>
+
+    <resource-bundle>messages.en_Bundle</resource-bundle>
+    <resource-bundle>messages.zh_Bundle</resource-bundle>
+
+    <actions>
+        <!-- id 是在用户双击 shift 键后的 actions 里用来搜索该功能的关键字-->
+        <action id="Alert Selected Info" class="hygge.plugin.generator.action.DemoAction"
+                icon="AllIcons.Debugger.ThreadStates.Socket"
+                text="弹窗提示选中的内容信息"
+                description="Some description">
+            <!--与运行按钮同栏位-->
+            <add-to-group group-id="NavBarToolBar" anchor="first"/>
+            <!--鼠标右键菜单内-->
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
