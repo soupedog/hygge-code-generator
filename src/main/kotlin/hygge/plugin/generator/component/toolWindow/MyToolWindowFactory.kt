@@ -5,6 +5,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.EnumComboBoxModel
@@ -14,6 +15,9 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.content.ContentFactory
+import com.intellij.ui.dsl.builder.bindText
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.gridLayout.HorizontalAlign
 import com.jetbrains.rd.swing.selectedItemProperty
 import hygge.plugin.generator.component.toolWindow.service.MyToolWindowService
 import hygge.plugin.generator.core.domain.bo.DatabaseConfiguration
@@ -28,7 +32,6 @@ import hygge.util.generator.java.bo.Modifier
 import hygge.util.generator.java.bo.Property
 import javax.swing.JButton
 
-
 /**
  * 新建一个工具栏(和 project 栏类似)，中间包含一个按钮，每次点击生成一个随机数并切换语言
  */
@@ -41,7 +44,7 @@ class MyToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val myToolWindow = MyToolWindow(toolWindow)
 
-        myToolWindow.bindComponent(project)
+        myToolWindow.initComponent(project)
 
         val content = ContentFactory.getInstance().createContent(myToolWindow.mainContent, null, false)
 
@@ -53,40 +56,21 @@ class MyToolWindowFactory : ToolWindowFactory {
     class MyToolWindow(toolWindow: ToolWindow) {
         private val service = toolWindow.project.service<MyToolWindowService>()
         val mainContent: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>()
-        val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
         val databaseConfigurationTitle: TitledSeparator = TitledSeparator()
+        val urlJBLabel: JBLabel = JBLabel()
+        val urlJBTextField: JBTextField = JBTextField()
         val userNameJBLabel: JBLabel = JBLabel()
         val userNameJBTextField: JBTextField = JBTextField()
         val passwordJBLabel: JBLabel = JBLabel()
         val passwordJBPasswordField: JBPasswordField = JBPasswordField()
+        val generatorCommandTitle: TitledSeparator = TitledSeparator()
+        val languageJBLabel = JBLabel()
+        val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
         val generateButton = JButton()
+        var configuration = DatabaseConfiguration("", "", "", "", "")
 
-        fun bindComponent(project: Project) {
-            refreshText(service.getCurrentLanguage())
 
-            mainContent.add(databaseConfigurationTitle)
-
-            mainContent.add(userNameJBLabel)
-            mainContent.add(userNameJBTextField)
-
-            mainContent.add(passwordJBLabel)
-            mainContent.add(passwordJBPasswordField)
-
-            // 点击生成按钮时，进行代码自动生成
-            generateButton.addActionListener {
-                val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
-                val databaseConfiguration = DatabaseConfiguration(
-                    project.basePath!!,
-                    "localhost",
-                    userNameJBTextField.text,
-                    String(passwordJBPasswordField.password),
-                    "/local_test"
-                )
-                println(jsonHelper.formatAsString(databaseConfiguration))
-                // 生成代码
-            }
-            mainContent.add(generateButton)
-
+        fun initComponent(project: Project) {
             // 检测到语言切换时刷新组件文本
             languageComboBox.addActionListener {
                 val comboBox: ComboBox<LanguageEnum> = it.source as ComboBox<LanguageEnum>
@@ -94,15 +78,84 @@ class MyToolWindowFactory : ToolWindowFactory {
                 refreshText(currentType.value!!)
             }
 
-            mainContent.add(languageComboBox)
+            // 点击生成按钮时，进行代码自动生成
+            generateButton.addActionListener {
+                val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
+                val databaseConfiguration = DatabaseConfiguration(
+                    project.basePath!!,
+                    urlJBTextField.text,
+                    userNameJBTextField.text,
+                    String(passwordJBPasswordField.password),
+                    "/local_test"
+                )
+                println(jsonHelper.formatAsString(databaseConfiguration))
+                // 生成代码
+            }
+
+            mainContent.add(configurationPanel(service.getCurrentLanguage()))
         }
 
         fun refreshText(languageType: LanguageEnum) {
             databaseConfigurationTitle.text = BundleUtil.message(languageType, "databaseConfigurationTitle")
+            urlJBLabel.text = BundleUtil.message(languageType, "urlJBLabel")
             userNameJBLabel.text = BundleUtil.message(languageType, "userNameJBLabel")
             passwordJBLabel.text = BundleUtil.message(languageType, "passwordJBLabel")
 
+            generatorCommandTitle.text = BundleUtil.message(languageType, "generatorCommandTitle")
+            languageJBLabel.text = BundleUtil.message(languageType, "languageJBLabel")
             generateButton.text = BundleUtil.message(languageType, "generateButton")
+        }
+
+        fun DatabaseConfiguration.getAuthor(): String {
+            return author!!
+        }
+
+        fun configurationPanel(languageType: LanguageEnum): DialogPanel {
+            refreshText(languageType)
+
+            val panel = panel {
+                group {
+                    row {
+                        cell(databaseConfigurationTitle)
+                    }
+                    row {
+                        cell(urlJBLabel)
+                        cell(urlJBTextField).horizontalAlign(HorizontalAlign.FILL)
+                    }
+                    row {
+                        cell(userNameJBLabel)
+                        cell(userNameJBTextField).horizontalAlign(HorizontalAlign.FILL)
+                    }
+                    row {
+                        cell(passwordJBLabel)
+                        cell(passwordJBPasswordField).horizontalAlign(HorizontalAlign.FILL)
+                    }
+                }
+
+                group("Generator Configuration") {
+                    row {
+                        checkBox("lombokEnable")
+                    }
+                    row {
+                        label("author:")
+                        textField().bindText(configuration::schema)
+                        label("date:")
+                        textField()
+                    }
+                }
+                group {
+                    row {
+                        cell(generatorCommandTitle)
+                    }
+                    row {
+                        cell(languageJBLabel)
+                        cell(languageComboBox)
+                        cell(generateButton)
+                    }
+                }
+            }
+
+            return panel
         }
 
         fun createButton(project: Project, label: JBLabel): JButton {

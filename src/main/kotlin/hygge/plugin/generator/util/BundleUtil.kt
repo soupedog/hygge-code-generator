@@ -15,8 +15,8 @@ object BundleUtil {
 
     private fun getBundle(language: LanguageEnum): DynamicBundle {
         return when (language) {
-            LanguageEnum.EN -> EnBundle
-            LanguageEnum.ZH -> ZhBundle
+            LanguageEnum.English -> EnBundle
+            LanguageEnum.简体中文 -> ZhBundle
         }
     }
 }

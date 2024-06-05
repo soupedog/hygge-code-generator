@@ -8,7 +8,7 @@ import hygge.plugin.generator.language.EnBundle
 
 @Service(Service.Level.PROJECT)
 class MyToolWindowService(project: Project) {
-    private var currentLanguage: LanguageEnum = LanguageEnum.EN;
+    private var currentLanguage: LanguageEnum = LanguageEnum.English;
 
     init {
         thisLogger().info(EnBundle.message("projectService", project.name))
@@ -19,10 +19,10 @@ class MyToolWindowService(project: Project) {
 
     fun setCurrentLanguage(language: LanguageEnum? = null) {
         if (language == null) {
-            if (LanguageEnum.EN == currentLanguage) {
-                currentLanguage = LanguageEnum.ZH
+            if (LanguageEnum.English == currentLanguage) {
+                currentLanguage = LanguageEnum.简体中文
             } else {
-                currentLanguage = LanguageEnum.EN
+                currentLanguage = LanguageEnum.English
             }
         } else {
             currentLanguage = language

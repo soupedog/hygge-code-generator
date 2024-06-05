@@ -19,6 +19,7 @@ class DatabaseConfiguration(
     var basePoPathSuffix: String = ".base"
     var enumPathSuffix: String = ".enums"
     var defaultTimeType: ClassInfo = OFFSET_DATE_TIME
-    var pathFromRepositoryRoot: String = ConstantParameters.FILE_SEPARATOR + "src" + ConstantParameters.FILE_SEPARATOR + "main" + ConstantParameters.FILE_SEPARATOR + "java"
+    var pathFromRepositoryRoot: String =
+        ConstantParameters.FILE_SEPARATOR + "src" + ConstantParameters.FILE_SEPARATOR + "main" + ConstantParameters.FILE_SEPARATOR + "java"
     var packageInfo: String = "hygge.domain"
 }
