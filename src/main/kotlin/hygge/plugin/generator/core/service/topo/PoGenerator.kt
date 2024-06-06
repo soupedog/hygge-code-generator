@@ -31,7 +31,7 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
         // 初始化扩展类
         abstractClassInfoContainer.values.forEach { abstractClassInfo ->
             if (abstractClassInfo.packageInfo == null) {
-                abstractClassInfo.packageInfo = configuration.packageInfo + configuration.poPathSuffix + configuration.basePoPathSuffix
+                abstractClassInfo.packageInfo = configuration.packageInfo + configuration.poPathSuffix + configuration.poBasePathSuffix
             }
         }
 
@@ -145,7 +145,7 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
                 "bit" -> ConstantClassInfoContainer.BOOLEAN
                 "int" -> ConstantClassInfoContainer.INTEGER
                 "bigint" -> ConstantClassInfoContainer.LONG
-                "datetime" -> configuration.defaultTimeType
+                "datetime" -> configuration.defaultTimeType.classInfo
                 "enum" -> {
                     var enumTypeRawMessage: String = column.columnType!!
                     // 删除开头的 "enum(" 与结尾的 ")"
