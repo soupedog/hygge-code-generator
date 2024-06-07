@@ -10,6 +10,7 @@ class DatabaseConfiguration(
     var password: String,
     var schema: String
 ) : JavaGeneratorConfiguration() {
+    var underscoreToCamelCaseEnable: Boolean = false
     var enumElementInterval: Int = 1
     var enumNameSuffix: String = "Enum"
     var poPathSuffix: String = ".po"

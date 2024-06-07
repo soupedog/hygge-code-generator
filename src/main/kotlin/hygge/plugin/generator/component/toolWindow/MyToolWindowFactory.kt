@@ -10,7 +10,10 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.EnumComboBoxModel
-import com.intellij.ui.components.*
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBPanel
+import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBTextField
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.gridLayout.HorizontalAlign
@@ -29,6 +32,7 @@ import hygge.util.definition.ParameterHelper
 import hygge.util.generator.java.bo.ClassInfo
 import hygge.util.generator.java.bo.Modifier
 import hygge.util.generator.java.bo.Property
+import java.util.*
 import javax.swing.JButton
 
 /**
@@ -42,7 +46,8 @@ class MyToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val myToolWindow = MyToolWindow(toolWindow)
-
+        // 默认收起工具栏
+        toolWindow.hide()
         myToolWindow.initComponent(project)
 
         val content = ContentFactory.getInstance().createContent(myToolWindow.mainContent, null, false)
@@ -68,6 +73,9 @@ class MyToolWindowFactory : ToolWindowFactory {
         val generateButton = JButton()
 
         fun initComponent(project: Project) {
+            // 初始化项目根目录
+            configuration.absolutePathOfProject = Optional.ofNullable(project.basePath).orElse("")
+
             // 检测到语言切换时刷新组件文本
             languageComboBox.addActionListener {
                 val comboBox: ComboBox<LanguageEnum> = it.source as ComboBox<LanguageEnum>
@@ -98,10 +106,10 @@ class MyToolWindowFactory : ToolWindowFactory {
             }
 
             panel = panel {
-                group(BundleUtil.message(languageType, "databaseConfigurationTitle")) {+4
-                    row() {
+                group(BundleUtil.message(languageType, "databaseConfigurationTitle")) {
+                    row {
                         comboBox(listOf("MySQL"))
-                            .label(BundleUtil.message(languageType,"databaseTypeJBLabel"))
+                            .label(BundleUtil.message(languageType, "databaseTypeJBLabel"))
 
                         cell(hostPortJBTextField).horizontalAlign(HorizontalAlign.FILL)
                             .bindText(configuration::hostPort)
@@ -137,13 +145,11 @@ class MyToolWindowFactory : ToolWindowFactory {
 
                 group(BundleUtil.message(languageType, "generatorConfigurationTitle")) {
                     row {
-                        checkBox(BundleUtil.message(languageType, "lombokEnableJBLabel"))
-                            .bindSelected(configuration::isLombokEnable, configuration::setLombokEnable)
-
                         textField().horizontalAlign(HorizontalAlign.FILL)
                             .bindText(configuration::packageInfo)
                             .label(BundleUtil.message(languageType, "outputPackageInfoJBLabel"))
                     }
+
                     row {
                         textField()
                             .bindText(configuration::getAuthor, configuration::setAuthor)
@@ -154,18 +160,27 @@ class MyToolWindowFactory : ToolWindowFactory {
                             .label(BundleUtil.message(languageType, "dateJBLabel"))
                     }
 
-                    group(BundleUtil.message(languageType, "poConfigurationTitle")) {
-                        row() {
-                            textField()
-                                .bindText(configuration::poPathSuffix)
-                                .label(BundleUtil.message(languageType, "poPathSuffixJBLabel"))
+                    row {
+                        checkBox(BundleUtil.message(languageType, "lombokEnableJBLabel"))
+                            .bindSelected(configuration::isLombokEnable, configuration::setLombokEnable)
 
-                            cell(timeClassInfoEnumComboBox).horizontalAlign(HorizontalAlign.LEFT)
+                        checkBox(BundleUtil.message(languageType, "underscoreToCamelCaseEnableJBLabel"))
+                            .bindSelected(configuration::underscoreToCamelCaseEnable)
+
+                    }
+
+                    group(BundleUtil.message(languageType, "poConfigurationTitle")) {
+                        row {
+                            cell(timeClassInfoEnumComboBox)
                                 .bindItem(configuration::defaultTimeType.toNullableProperty())
                                 .label(BundleUtil.message(languageType, "poDefaultTimeTypeJBLabel"))
                         }
                         row {
                             textField()
+                                .bindText(configuration::poPathSuffix)
+                                .label(BundleUtil.message(languageType, "poPathSuffixJBLabel"))
+
+                            textField().horizontalAlign(HorizontalAlign.FILL)
                                 .bindText(configuration::poBasePathSuffix)
                                 .label(BundleUtil.message(languageType, "poBaseClassPathSuffixJBLabel"))
                         }
@@ -177,20 +192,20 @@ class MyToolWindowFactory : ToolWindowFactory {
 
                     group(BundleUtil.message(languageType, "enumConfigurationTitle")) {
                         row {
+                            spinner(0..100000)
+                                .bindIntValue(configuration::enumElementInterval)
+                                .label(BundleUtil.message(languageType, "enumElementIndexIntervalJBLabel"))
+
+                            checkBox(BundleUtil.message(languageType, "enumPropertyModifiableJBLabel"))
+                                .bindSelected(configuration::isEnumPropertyModifiable, configuration::setEnumPropertyModifiable)
+                        }
+                        row {
                             textField()
                                 .bindText(configuration::enumPathSuffix)
                                 .label(BundleUtil.message(languageType, "enumPathSuffixJBLabel"))
                             textField().horizontalAlign(HorizontalAlign.FILL)
                                 .bindText(configuration::enumNameSuffix)
                                 .label(BundleUtil.message(languageType, "enumNameSuffixJBLabel"))
-                        }
-                        row {
-                            checkBox(BundleUtil.message(languageType, "enumPropertyModifiableJBLabel"))
-                                .bindSelected(configuration::isEnumPropertyModifiable, configuration::setEnumPropertyModifiable)
-
-                            spinner(0..100000)
-                                .bindIntValue(configuration::enumElementInterval)
-                                .label(BundleUtil.message(languageType, "enumElementIndexIntervalJBLabel"))
                         }
                         row {
                             expandableTextField().horizontalAlign(HorizontalAlign.FILL)
@@ -204,7 +219,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                         cell(languageComboBox)
                             .label(BundleUtil.message(languageType, "languageJBLabel"))
                         button(BundleUtil.message(languageType, "generateButton")) {
-                            if (schemaOptionList.isEmpty() || parameterHelper.isEmpty(configuration.schema)) {
+                            if (schemaOptionList.isEmpty()) {
                                 NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextNoSchema"))
                             } else {
                                 // 面板 bind 数据先进行保存同步
