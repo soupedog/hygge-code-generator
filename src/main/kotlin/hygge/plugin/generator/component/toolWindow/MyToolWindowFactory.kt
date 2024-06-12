@@ -1,6 +1,7 @@
 package hygge.plugin.generator.component.toolWindow
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jsonMapper
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
@@ -10,7 +11,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.EnumComboBoxModel
-import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
@@ -21,6 +21,7 @@ import com.jetbrains.rd.swing.selectedItemProperty
 import hygge.plugin.generator.component.toolWindow.service.MyToolWindowService
 import hygge.plugin.generator.core.domain.bo.DatabaseConfiguration
 import hygge.plugin.generator.core.domain.bo.TimeClassInfoEnum
+import hygge.plugin.generator.core.service.topo.MysqlDatabaseInfoScanner
 import hygge.plugin.generator.core.service.topo.PoGenerator
 import hygge.plugin.generator.language.LanguageEnum
 import hygge.plugin.generator.util.BundleUtil
@@ -32,6 +33,7 @@ import hygge.util.definition.ParameterHelper
 import hygge.util.generator.java.bo.ClassInfo
 import hygge.util.generator.java.bo.Modifier
 import hygge.util.generator.java.bo.Property
+import hygge.util.json.jackson.impl.DefaultJsonHelper
 import java.util.*
 import javax.swing.JButton
 
@@ -61,16 +63,17 @@ class MyToolWindowFactory : ToolWindowFactory {
         private var parentDisposable = toolWindow.disposable
         private val service = toolWindow.project.service<MyToolWindowService>()
         private val parameterHelper = UtilCreator.INSTANCE.getDefaultInstance(ParameterHelper::class.java)
+        private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
         var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
         val mainContent: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>()
         lateinit var panel: DialogPanel
         val hostPortJBTextField: JBTextField = JBTextField()
         val userNameJBTextField: JBTextField = JBTextField()
         val passwordJBPasswordField: JBPasswordField = JBPasswordField()
-        val schemaOptionList = ArrayList<String>()
         val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
         val timeClassInfoEnumComboBox = ComboBox(EnumComboBoxModel(TimeClassInfoEnum::class.java))
         val generateButton = JButton()
+        var schemaCell: Cell<ComboBox<String>>? = null
 
         fun initComponent(project: Project) {
             // 初始化项目根目录
@@ -124,20 +127,47 @@ class MyToolWindowFactory : ToolWindowFactory {
                             .bindText(configuration::password)
                     }
                     row {
-                        comboBox(schemaOptionList)
+                        schemaCell = comboBox(ArrayList<String>())
                             .bindItem(configuration::schema.toNullableProperty())
                             .label(BundleUtil.message(languageType, "schemaJBLabel"))
-
                         button(BundleUtil.message(languageType, "fetchSchemeButton")) {
-                            // 先 removeAll 再刷新组件，响应时间会比较短
-                            panel.removeAll()
+                            // 参数校验
+                            if (parameterHelper.isEmpty(hostPortJBTextField.text)) {
+                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "hostPortJBLabel")))
+                                return@button
+                            }
+                            if (parameterHelper.isEmpty(userNameJBTextField.text)) {
+                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "userNameJBLabel")))
+                                return@button
+                            }
+                            if (parameterHelper.isEmpty(String(passwordJBPasswordField.password))) {
+                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "passwordJBLabel")))
+                                return@button
+                            }
 
-                            schemaOptionList.clear()
-                            schemaOptionList.add("local_test")
-                            schemaOptionList.add("uat")
+                            try {// 链接数据库拉取 Schema
+                                val mysqlDatabaseInfoScanner = MysqlDatabaseInfoScanner(
+                                    hostPortJBTextField.text,
+                                    userNameJBTextField.text,
+                                    String(passwordJBPasswordField.password)
+                                )
 
-                            freshConfigurationPanel(languageType)
-                            NotificationsUtil.info("完毕")
+                                val schemaNameList = mysqlDatabaseInfoScanner.getSchemaNameList()
+                                // 清空选项
+                                schemaCell!!.component.removeAllItems()
+                                schemaNameList.forEach {
+                                    schemaCell!!.component.addItem(it)
+                                }
+                                NotificationsUtil.info(BundleUtil.message(languageType, "infoTextSchemaFetchComplete"))
+                            } catch (e: Exception) {
+                                NotificationsUtil.error(
+                                    BundleUtil.message(
+                                        languageType, "errorTextDatabaseConnectionError",
+                                        userNameJBTextField.text,
+                                        hostPortJBTextField.text
+                                    )
+                                )
+                            }
 
                         }.horizontalAlign(HorizontalAlign.RIGHT)
                     }
@@ -219,15 +249,51 @@ class MyToolWindowFactory : ToolWindowFactory {
                         cell(languageComboBox)
                             .label(BundleUtil.message(languageType, "languageJBLabel"))
                         button(BundleUtil.message(languageType, "generateButton")) {
-                            if (schemaOptionList.isEmpty()) {
+                            // 如果未选择 schema
+                            if (schemaCell!!.component.selectedItem == null) {
                                 NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextNoSchema"))
                             } else {
                                 // 面板 bind 数据先进行保存同步
                                 panel.apply()
 
+                                var enumContainer: MutableMap<String, ClassInfo> = HashMap()
+                                var abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
+
+                                // TODO 参数校验
+                                val basePo = ClassInfo.builder()
+                                    .name("BasePo")
+                                    .description("PO 对象基类")
+                                    .modifiers(collectionHelper.createCollection(Modifier.PUBLIC, Modifier.ABSTRACT))
+                                    .properties(
+                                        collectionHelper.createCollection(
+                                            Property.builder()
+                                                .name("createTs")
+                                                .classInfo(configuration.defaultTimeType.classInfo)
+                                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
+                                                .description("创建 UTC 毫秒级时间戳")
+                                                .build(),
+                                            Property.builder()
+                                                .name("lastUpdateTs")
+                                                .classInfo(configuration.defaultTimeType.classInfo)
+                                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
+                                                .description("最后修改 UTC 毫秒级时间戳")
+                                                .build()
+                                        )
+                                    )
+                                    .build()
+
+                                basePo.init(configuration)
+                                basePo.annotations.remove(ConstantClassInfoContainer.BUILDER)
+                                basePo.annotations.remove(ConstantClassInfoContainer.ALL_ARGS_CONSTRUCTOR)
+
+                                abstractClassInfoContainer[basePo.name] = basePo
+
+
                                 val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
-                                println(jsonHelper.formatAsString(configuration))
-                                // 生成代码
+                                println(jsonHelper.formatAsString(basePo))
+
+                                PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()
+
                             }
                         }.horizontalAlign(HorizontalAlign.RIGHT)
                     }
@@ -246,65 +312,6 @@ class MyToolWindowFactory : ToolWindowFactory {
             Disposer.register(parentDisposable, disposable)
 
             return panel
-        }
-
-        fun createButton(project: Project, label: JBLabel): JButton {
-            val buttonText: String = BundleUtil.message(service.getCurrentLanguage(), "shuffle")
-            val button = JButton(buttonText)
-
-            // 点击事件监听
-            button.addActionListener {
-                // 切换语言
-                service.setCurrentLanguage()
-
-                val schema = "local_test"
-                val databaseConfiguration =
-                    DatabaseConfiguration(project.basePath!!, "localhost:3306/", "root", "0000", schema)
-                databaseConfiguration.enumElementInterval = 100
-                databaseConfiguration.isLombokEnable = true
-
-                var enumContainer: MutableMap<String, ClassInfo> = HashMap()
-
-                var abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
-
-                val collectionHelper: CollectionHelper =
-                    UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
-
-                val basePo = ClassInfo.builder()
-                    .name("BasePo")
-                    .description("PO 对象基类")
-                    .modifiers(collectionHelper.createCollection(Modifier.PUBLIC, Modifier.ABSTRACT))
-                    .properties(
-                        collectionHelper.createCollection(
-                            Property.builder()
-                                .name("createTs")
-                                .classInfo(databaseConfiguration.defaultTimeType.classInfo)
-                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
-                                .description("创建 UTC 毫秒级时间戳")
-                                .build(),
-                            Property.builder()
-                                .name("lastUpdateTs")
-                                .classInfo(databaseConfiguration.defaultTimeType.classInfo)
-                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
-                                .description("最后修改 UTC 毫秒级时间戳")
-                                .build()
-                        )
-                    )
-                    .build()
-
-                basePo.init(databaseConfiguration)
-                basePo.annotations.remove(ConstantClassInfoContainer.BUILDER)
-                basePo.annotations.remove(ConstantClassInfoContainer.ALL_ARGS_CONSTRUCTOR)
-
-                abstractClassInfoContainer[basePo.name] = basePo
-
-                PoGenerator(databaseConfiguration, enumContainer, abstractClassInfoContainer).generatePO()
-
-                // 重新加载文本
-                label.text = BundleUtil.message(service.getCurrentLanguage(), "randomLabel", service.getRandomNumber())
-                button.text = BundleUtil.message(service.getCurrentLanguage(), "shuffle")
-            }
-            return button
         }
     }
 }

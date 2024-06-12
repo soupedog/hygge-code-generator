@@ -10,6 +10,15 @@ import org.apache.ibatis.annotations.Select
 @Mapper
 interface MySqlMapper {
     /**
+     * 查询 MySQL 中所有 SCHEMA 名称
+     *
+     * @param schema 库名
+     * @return 表名集合
+     */
+    @Select("SELECT SCHEMA_NAME AS 'Database Name' FROM INFORMATION_SCHEMA.SCHEMATA")
+    fun querySchemaNameList(): ArrayList<String>
+
+    /**
      * 查询特定库中的所有表名
      *
      * @param schema 库名

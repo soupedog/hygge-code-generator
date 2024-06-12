@@ -20,6 +20,15 @@ class MysqlDatabaseInfoScanner(hostPort: String, userName: String, password: Str
         sqlSessionFactory = createSqlSessionFactory(createDataSource(hostPort, userName, password))
     }
 
+    fun getSchemaNameList(): ArrayList<String> {
+        val sqlSession: SqlSession = sqlSessionFactory.openSession()
+        val mapper: MySqlMapper = sqlSession.getMapper(MySqlMapper::class.java)
+
+        sqlSession.use {
+            return mapper.querySchemaNameList()
+        }
+    }
+
     fun getTableInfoBySchemaName(schema: String): ArrayList<MysqlTablesInfo> {
         val sqlSession: SqlSession = sqlSessionFactory.openSession()
         val mapper: MySqlMapper = sqlSession.getMapper(MySqlMapper::class.java)
