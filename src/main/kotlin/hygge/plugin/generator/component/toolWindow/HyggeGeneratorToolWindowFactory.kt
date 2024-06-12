@@ -1,7 +1,6 @@
 package hygge.plugin.generator.component.toolWindow
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jsonMapper
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
@@ -18,7 +17,7 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.gridLayout.HorizontalAlign
 import com.jetbrains.rd.swing.selectedItemProperty
-import hygge.plugin.generator.component.toolWindow.service.MyToolWindowService
+import hygge.plugin.generator.component.service.HyggeGeneratorToolWindowService
 import hygge.plugin.generator.core.domain.bo.DatabaseConfiguration
 import hygge.plugin.generator.core.domain.bo.TimeClassInfoEnum
 import hygge.plugin.generator.core.service.topo.MysqlDatabaseInfoScanner
@@ -33,35 +32,29 @@ import hygge.util.definition.ParameterHelper
 import hygge.util.generator.java.bo.ClassInfo
 import hygge.util.generator.java.bo.Modifier
 import hygge.util.generator.java.bo.Property
-import hygge.util.json.jackson.impl.DefaultJsonHelper
 import java.util.*
 import javax.swing.JButton
 
 /**
  * 新建一个工具栏(和 project 栏类似)，中间包含一个按钮，每次点击生成一个随机数并切换语言
  */
-class MyToolWindowFactory : ToolWindowFactory {
-
-    init {
-        thisLogger().warn("MyToolWindowFactory start.")
-    }
-
+class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val myToolWindow = MyToolWindow(toolWindow)
+        val hyggeGeneratorToolWindow = HyggeGeneratorToolWindow(toolWindow)
         // 默认收起工具栏
         toolWindow.hide()
-        myToolWindow.initComponent(project)
+        hyggeGeneratorToolWindow.initComponent(project)
 
-        val content = ContentFactory.getInstance().createContent(myToolWindow.mainContent, null, false)
+        val content = ContentFactory.getInstance().createContent(hyggeGeneratorToolWindow.mainContent, null, false)
 
         toolWindow.contentManager.addContent(content)
     }
 
     override fun shouldBeAvailable(project: Project) = true
 
-    class MyToolWindow(toolWindow: ToolWindow) {
+    class HyggeGeneratorToolWindow(toolWindow: ToolWindow) {
         private var parentDisposable = toolWindow.disposable
-        private val service = toolWindow.project.service<MyToolWindowService>()
+        private val service = toolWindow.project.service<HyggeGeneratorToolWindowService>()
         private val parameterHelper = UtilCreator.INSTANCE.getDefaultInstance(ParameterHelper::class.java)
         private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
         var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
@@ -70,10 +63,10 @@ class MyToolWindowFactory : ToolWindowFactory {
         val hostPortJBTextField: JBTextField = JBTextField()
         val userNameJBTextField: JBTextField = JBTextField()
         val passwordJBPasswordField: JBPasswordField = JBPasswordField()
-        val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
-        val timeClassInfoEnumComboBox = ComboBox(EnumComboBoxModel(TimeClassInfoEnum::class.java))
-        val generateButton = JButton()
         var schemaCell: Cell<ComboBox<String>>? = null
+        val timeClassInfoEnumComboBox = ComboBox(EnumComboBoxModel(TimeClassInfoEnum::class.java))
+        val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
+        val generateButton = JButton()
 
         fun initComponent(project: Project) {
             // 初始化项目根目录
@@ -133,15 +126,33 @@ class MyToolWindowFactory : ToolWindowFactory {
                         button(BundleUtil.message(languageType, "fetchSchemeButton")) {
                             // 参数校验
                             if (parameterHelper.isEmpty(hostPortJBTextField.text)) {
-                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "hostPortJBLabel")))
+                                NotificationsUtil.warn(
+                                    BundleUtil.message(
+                                        languageType,
+                                        "warningTextEmpty",
+                                        BundleUtil.message(languageType, "hostPortJBLabel")
+                                    )
+                                )
                                 return@button
                             }
                             if (parameterHelper.isEmpty(userNameJBTextField.text)) {
-                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "userNameJBLabel")))
+                                NotificationsUtil.warn(
+                                    BundleUtil.message(
+                                        languageType,
+                                        "warningTextEmpty",
+                                        BundleUtil.message(languageType, "userNameJBLabel")
+                                    )
+                                )
                                 return@button
                             }
                             if (parameterHelper.isEmpty(String(passwordJBPasswordField.password))) {
-                                NotificationsUtil.warn(BundleUtil.message(languageType, "warningTextEmpty", BundleUtil.message(languageType, "passwordJBLabel")))
+                                NotificationsUtil.warn(
+                                    BundleUtil.message(
+                                        languageType,
+                                        "warningTextEmpty",
+                                        BundleUtil.message(languageType, "passwordJBLabel")
+                                    )
+                                )
                                 return@button
                             }
 
@@ -160,6 +171,8 @@ class MyToolWindowFactory : ToolWindowFactory {
                                 }
                                 NotificationsUtil.info(BundleUtil.message(languageType, "infoTextSchemaFetchComplete"))
                             } catch (e: Exception) {
+                                thisLogger().error(e)
+
                                 NotificationsUtil.error(
                                     BundleUtil.message(
                                         languageType, "errorTextDatabaseConnectionError",
@@ -292,8 +305,12 @@ class MyToolWindowFactory : ToolWindowFactory {
                                 val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
                                 println(jsonHelper.formatAsString(basePo))
 
-                                PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()
-
+                                try {
+                                    PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()
+                                    NotificationsUtil.info(BundleUtil.message(languageType, "infoTextCodeGenerateComplete"))
+                                } catch (e: Exception) {
+                                    thisLogger().error(e)
+                                }
                             }
                         }.horizontalAlign(HorizontalAlign.RIGHT)
                     }

@@ -28,23 +28,11 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="hygge.plugin.generator.component.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <toolWindow factoryClass="hygge.plugin.generator.component.toolWindow.HyggeGeneratorToolWindowFactory" id="HyggeGenerator"/>
         <notificationGroup id="Global_NotificationsUtil" displayType="BALLOON"/>
     </extensions>
 
     <resource-bundle>messages.en_Bundle</resource-bundle>
     <resource-bundle>messages.zh_Bundle</resource-bundle>
 
-    <actions>
-        <!-- id 是在用户双击 shift 键后的 actions 里用来搜索该功能的关键字-->
-        <action id="Alert Selected Info" class="hygge.plugin.generator.action.DemoAction"
-                icon="AllIcons.Debugger.ThreadStates.Socket"
-                text="弹窗提示选中的内容信息"
-                description="Some description">
-            <!--与运行按钮同栏位-->
-            <add-to-group group-id="NavBarToolBar" anchor="first"/>
-            <!--鼠标右键菜单内-->
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-    </actions>
 </idea-plugin>
