@@ -1,5 +1,6 @@
 package hygge.plugin.generator.component.toolWindow
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -26,14 +27,11 @@ import hygge.plugin.generator.language.LanguageEnum
 import hygge.plugin.generator.util.BundleUtil
 import hygge.plugin.generator.util.NotificationsUtil
 import hygge.util.UtilCreator
-import hygge.util.constant.ConstantClassInfoContainer
 import hygge.util.definition.CollectionHelper
 import hygge.util.definition.ParameterHelper
 import hygge.util.generator.java.bo.ClassInfo
-import hygge.util.generator.java.bo.Modifier
-import hygge.util.generator.java.bo.Property
+import hygge.util.json.jackson.impl.DefaultJsonHelper
 import java.util.*
-import javax.swing.JButton
 
 /**
  * 新建一个工具栏(和 project 栏类似)，中间包含一个按钮，每次点击生成一个随机数并切换语言
@@ -55,6 +53,7 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
     class HyggeGeneratorToolWindow(toolWindow: ToolWindow) {
         private var parentDisposable = toolWindow.disposable
         private val service = toolWindow.project.service<HyggeGeneratorToolWindowService>()
+        private val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true) as DefaultJsonHelper
         private val parameterHelper = UtilCreator.INSTANCE.getDefaultInstance(ParameterHelper::class.java)
         private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
         var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
@@ -66,7 +65,10 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
         var schemaCell: Cell<ComboBox<String>>? = null
         val timeClassInfoEnumComboBox = ComboBox(EnumComboBoxModel(TimeClassInfoEnum::class.java))
         val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
-        val generateButton = JButton()
+
+
+        private val TYPE_REFERENCE_CLASS_INFO_LIST: TypeReference<ArrayList<ClassInfo>> = object : TypeReference<ArrayList<ClassInfo>>() {
+        }
 
         fun initComponent(project: Project) {
             // 初始化项目根目录
@@ -82,13 +84,6 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
                     service.setCurrentLanguage(currentType.value!!)
                     freshConfigurationPanel(currentType.value!!)
                 }
-            }
-
-            // 点击生成按钮时，进行代码自动生成
-            generateButton.addActionListener {
-                val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
-                println(jsonHelper.formatAsString(configuration))
-                // 生成代码
             }
 
             freshConfigurationPanel(service.getCurrentLanguage())
@@ -229,13 +224,14 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
                         }
                         row {
                             expandableTextField().horizontalAlign(HorizontalAlign.FILL)
+                                .bindText(configuration::baseInfoJson)
                                 .label(BundleUtil.message(languageType, "poBaseClassInfoJBLabel"))
                         }
                     }
 
                     group(BundleUtil.message(languageType, "enumConfigurationTitle")) {
                         row {
-                            spinner(0..100000)
+                            spinner(1..100000)
                                 .bindIntValue(configuration::enumElementInterval)
                                 .label(BundleUtil.message(languageType, "enumElementIndexIntervalJBLabel"))
 
@@ -252,6 +248,7 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
                         }
                         row {
                             expandableTextField().horizontalAlign(HorizontalAlign.FILL)
+                                .bindText(configuration::enumInfoJson)
                                 .label(BundleUtil.message(languageType, "enumInfoJBLabel"))
                         }
                     }
@@ -269,41 +266,20 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
                                 // 面板 bind 数据先进行保存同步
                                 panel.apply()
 
-                                var enumContainer: MutableMap<String, ClassInfo> = HashMap()
-                                var abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
+                                // 读取静态自定义枚举信息
+                                val enumContainer: MutableMap<String, ClassInfo> = HashMap()
+                                val enumInfoList = jsonHelper.readAsObject(configuration.enumInfoJson, TYPE_REFERENCE_CLASS_INFO_LIST)
+                                enumInfoList.forEach {
+                                    enumContainer[parameterHelper.lowerCaseFirstLetter(it.name)] = it
+                                }
 
-                                // TODO 参数校验
-                                val basePo = ClassInfo.builder()
-                                    .name("BasePo")
-                                    .description("PO 对象基类")
-                                    .modifiers(collectionHelper.createCollection(Modifier.PUBLIC, Modifier.ABSTRACT))
-                                    .properties(
-                                        collectionHelper.createCollection(
-                                            Property.builder()
-                                                .name("createTs")
-                                                .classInfo(configuration.defaultTimeType.classInfo)
-                                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
-                                                .description("创建 UTC 毫秒级时间戳")
-                                                .build(),
-                                            Property.builder()
-                                                .name("lastUpdateTs")
-                                                .classInfo(configuration.defaultTimeType.classInfo)
-                                                .modifiers(collectionHelper.createCollection(Modifier.PROTECTED))
-                                                .description("最后修改 UTC 毫秒级时间戳")
-                                                .build()
-                                        )
-                                    )
-                                    .build()
-
-                                basePo.init(configuration)
-                                basePo.annotations.remove(ConstantClassInfoContainer.BUILDER)
-                                basePo.annotations.remove(ConstantClassInfoContainer.ALL_ARGS_CONSTRUCTOR)
-
-                                abstractClassInfoContainer[basePo.name] = basePo
-
-
-                                val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true)
-                                println(jsonHelper.formatAsString(basePo))
+                                val classInfoList = jsonHelper.readAsObject(configuration.baseInfoJson, TYPE_REFERENCE_CLASS_INFO_LIST)
+                                // 读取静态自定义基类信息
+                                val abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
+                                classInfoList.forEach {
+                                    // 类名转化为属性名(首字母换小写) e.g : UserInfo → userInfo
+                                    abstractClassInfoContainer[it.name] = it
+                                }
 
                                 try {
                                     PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()

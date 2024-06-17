@@ -12,10 +12,12 @@ class DatabaseConfiguration(
 ) : JavaGeneratorConfiguration() {
     var underscoreToCamelCaseEnable: Boolean = false
     var enumElementInterval: Int = 1
+    var enumPathSuffix: String = ".enums"
     var enumNameSuffix: String = "Enum"
+    var enumInfoJson: String = "[]"
     var poPathSuffix: String = ".po"
     var poBasePathSuffix: String = ".base"
-    var enumPathSuffix: String = ".enums"
+    var baseInfoJson: String = "[]"
     var defaultTimeType: TimeClassInfoEnum = TimeClassInfoEnum.ZONED_DATE_TIME
     var pathFromRepositoryRoot: String = ConstantParameters.FILE_SEPARATOR + "src" + ConstantParameters.FILE_SEPARATOR + "main" + ConstantParameters.FILE_SEPARATOR + "java"
     var packageInfo: String = "hygge.domain"
