@@ -53,10 +53,10 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
     class HyggeGeneratorToolWindow(toolWindow: ToolWindow) {
         private var parentDisposable = toolWindow.disposable
         private val service = toolWindow.project.service<HyggeGeneratorToolWindowService>()
+        private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
         private val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true) as DefaultJsonHelper
         private val parameterHelper = UtilCreator.INSTANCE.getDefaultInstance(ParameterHelper::class.java)
-        private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
-        var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
+        private var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
         val mainContent: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>()
         lateinit var panel: DialogPanel
         val hostPortJBTextField: JBTextField = JBTextField()
@@ -66,8 +66,7 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
         val timeClassInfoEnumComboBox = ComboBox(EnumComboBoxModel(TimeClassInfoEnum::class.java))
         val languageComboBox = ComboBox(EnumComboBoxModel(LanguageEnum::class.java))
 
-
-        private val TYPE_REFERENCE_CLASS_INFO_LIST: TypeReference<ArrayList<ClassInfo>> = object : TypeReference<ArrayList<ClassInfo>>() {
+        private val typeReferenceClassInfoList: TypeReference<ArrayList<ClassInfo>> = object : TypeReference<ArrayList<ClassInfo>>() {
         }
 
         fun initComponent(project: Project) {
@@ -266,26 +265,53 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
                                 // 面板 bind 数据先进行保存同步
                                 panel.apply()
 
-                                // 读取静态自定义枚举信息
+                                var needCancelGeneration = false
+                                var warningText = ""
+
                                 val enumContainer: MutableMap<String, ClassInfo> = HashMap()
-                                val enumInfoList = jsonHelper.readAsObject(configuration.enumInfoJson, TYPE_REFERENCE_CLASS_INFO_LIST)
-                                enumInfoList.forEach {
-                                    enumContainer[parameterHelper.lowerCaseFirstLetter(it.name)] = it
-                                }
-
-                                val classInfoList = jsonHelper.readAsObject(configuration.baseInfoJson, TYPE_REFERENCE_CLASS_INFO_LIST)
-                                // 读取静态自定义基类信息
-                                val abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
-                                classInfoList.forEach {
-                                    // 类名转化为属性名(首字母换小写) e.g : UserInfo → userInfo
-                                    abstractClassInfoContainer[it.name] = it
-                                }
-
+                                // 读取静态自定义枚举信息
                                 try {
-                                    PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()
-                                    NotificationsUtil.info(BundleUtil.message(languageType, "infoTextCodeGenerateComplete"))
+                                    val enumInfoList = jsonHelper.readAsObject(configuration.enumInfoJson, typeReferenceClassInfoList)
+                                    enumInfoList.forEach {
+                                        enumContainer[parameterHelper.lowerCaseFirstLetter(it.name)] = it
+                                    }
                                 } catch (e: Exception) {
                                     thisLogger().error(e)
+                                    needCancelGeneration = true
+                                    warningText = BundleUtil.message(
+                                        languageType, "warningTestUnexpectedJson",
+                                        BundleUtil.message(languageType, "enumInfoJBLabel"),
+                                        "List&lt;ClassInfo&gt;"
+                                    )
+                                }
+
+                                val abstractClassInfoContainer: MutableMap<String, ClassInfo> = HashMap()
+                                try {// 读取静态自定义基类信息
+                                    val classInfoList = jsonHelper.readAsObject(configuration.baseInfoJson, typeReferenceClassInfoList)
+                                    classInfoList.forEach {
+                                        // 类名转化为属性名(首字母换小写) e.g : UserInfo → userInfo
+                                        abstractClassInfoContainer[it.name] = it
+                                    }
+                                } catch (e: Exception) {
+                                    thisLogger().error(e)
+                                    needCancelGeneration = true
+                                    warningText = BundleUtil.message(
+                                        languageType, "warningTestUnexpectedJson",
+                                        BundleUtil.message(languageType, "poBaseClassInfoJBLabel"),
+                                        // 大于小于号需要转义才能正常显示
+                                        "List&lt;ClassInfo&gt;"
+                                    )
+                                }
+
+                                if (!needCancelGeneration) {
+                                    try {
+                                        PoGenerator(configuration, enumContainer, abstractClassInfoContainer).generatePO()
+                                        NotificationsUtil.info(BundleUtil.message(languageType, "infoTextCodeGenerateComplete"))
+                                    } catch (e: Exception) {
+                                        thisLogger().error(e)
+                                    }
+                                } else {
+                                    NotificationsUtil.warn(warningText)
                                 }
                             }
                         }.horizontalAlign(HorizontalAlign.RIGHT)
