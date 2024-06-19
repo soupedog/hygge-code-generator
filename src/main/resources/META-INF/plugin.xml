@@ -13,12 +13,30 @@
     <!-- Description of the hygge.plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
-    <description><![CDATA[
-    <h1>简单测试<h1/>
-    <h2>听说你支持 Html 标签？</h2>
-    <h2>是真的？<h2/>
-    <h2>最低长度不能低于 40 个字哟<h2/>
-  ]]></description>
+    <description>
+        <![CDATA[
+            <div>
+                <span style="font-weight: bold; font-size: 18px;">简介：</span>
+            <div/>
+            <div>
+                该插件是一个代码生成器，能够连接数据库拉取表信息，并在当前项目指定的包路径中添加表对应的 Java PO(Persistent Object) 代码。
+            <div/>
+            <br/>
+            <div>
+                <span style="font-weight: bold; font-size: 18px;">使用方法：</span>
+            <div/>
+            <div>
+                <ul style="margin-top: 0;">
+                    <li>输入数据库 host/port</li>
+                    <li>输入数据库的账号、密码</li>
+                    <li>点击 拉取 schema 按钮</li>
+                    <li>下拉框选中一个 schema</li>
+                    <li>配置好生成选项</li>
+                    <li>点击一键生成按钮</li>
+                </ul>
+            </div>
+         ]]>
+    </description>
 
     <!-- Product and hygge.plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->

@@ -56,7 +56,7 @@ class HyggeGeneratorToolWindowFactory : ToolWindowFactory {
         private val collectionHelper: CollectionHelper = UtilCreator.INSTANCE.getDefaultInstance(CollectionHelper::class.java)
         private val jsonHelper = UtilCreator.INSTANCE.getDefaultJsonHelperInstance<ObjectMapper>(true) as DefaultJsonHelper
         private val parameterHelper = UtilCreator.INSTANCE.getDefaultInstance(ParameterHelper::class.java)
-        private var configuration = DatabaseConfiguration("", "localhost:3306/", "", "", "")
+        private var configuration = DatabaseConfiguration("", "localhost:3306", "", "", "")
         val mainContent: JBPanel<JBPanel<*>> = JBPanel<JBPanel<*>>()
         lateinit var panel: DialogPanel
         val hostPortJBTextField: JBTextField = JBTextField()

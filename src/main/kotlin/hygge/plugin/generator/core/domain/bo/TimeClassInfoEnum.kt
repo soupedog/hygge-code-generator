@@ -7,5 +7,4 @@ enum class TimeClassInfoEnum(val classInfo: ClassInfo) {
     LOCAL_DATE_TIME(hygge.util.constant.ConstantClassInfoContainer.LOCAL_DATE_TIME),
     ZONED_DATE_TIME(hygge.util.constant.ConstantClassInfoContainer.ZONED_DATE_TIME),
     OFFSET_DATE_TIME(hygge.util.constant.ConstantClassInfoContainer.OFFSET_DATE_TIME),
-    LONG(hygge.util.constant.ConstantClassInfoContainer.LONG),
 }

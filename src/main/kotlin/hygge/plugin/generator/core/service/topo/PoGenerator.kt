@@ -50,7 +50,7 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
             val classInfo = ClassInfo()
             classInfo.init(configuration)
             classInfo.packageInfo = configuration.packageInfo + configuration.poPathSuffix
-            classInfo.name = parseIntoClassName(true, tableInfo.tableName!!)
+            classInfo.name = parseIntoClassName(configuration.underscoreToCamelCaseEnable, tableInfo.tableName!!)
             classInfo.description = tableInfo.tableComment
 
             val columns: ArrayList<MysqlColumnInfo> = mysqlDatabaseInfoScanner.getColumnInfoBySchemaTableName(configuration.schema, tableInfo.tableName!!)
@@ -58,7 +58,7 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
             columns.forEach { column ->
                 val propertyList: MutableList<Property> = classInfo.properties
                 val property = Property.builder()
-                    .name(getAttributeName(true, column.columnName!!))
+                    .name(getAttributeName(configuration.underscoreToCamelCaseEnable, column.columnName!!))
                     .classInfo(parseIntoClassInfo(column))
                     .description(column.columnComment)
                     .build()
@@ -142,10 +142,22 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
             return result
         } else {
             return when (column.dataType) {
-                "bit" -> ConstantClassInfoContainer.BOOLEAN
+                "tinyint" -> if (column.columnType == "tinyint(1)") {
+                    // 实际上是 Boolean 类型
+                    return ConstantClassInfoContainer.BOOLEAN
+                } else {
+                    ConstantClassInfoContainer.BYTE
+                }
+
+                "smallint" -> ConstantClassInfoContainer.SHORT
+                "mediumint" -> ConstantClassInfoContainer.INTEGER
                 "int" -> ConstantClassInfoContainer.INTEGER
                 "bigint" -> ConstantClassInfoContainer.LONG
+                "float" -> ConstantClassInfoContainer.FLOAT
+                "double" -> ConstantClassInfoContainer.DOUBLE
+                "decimal" -> ConstantClassInfoContainer.BIG_DECIMAL
                 "datetime" -> configuration.defaultTimeType.classInfo
+                "timestamp" -> configuration.defaultTimeType.classInfo
                 "enum" -> {
                     var enumTypeRawMessage: String = column.columnType!!
                     // 删除开头的 "enum(" 与结尾的 ")"
@@ -203,9 +215,9 @@ class PoGenerator(private var configuration: DatabaseConfiguration, private var 
                         .properties(
                             collectionHelper.createCollection(
                                 Property.builder()
-                                    .name("value")
+                                    .name("index")
                                     .classInfo(ConstantClassInfoContainer.INTEGER)
-                                    .description("枚举数字值")
+                                    .description("枚举序号值")
                                     .build(),
                                 Property.builder()
                                     .name("text")
